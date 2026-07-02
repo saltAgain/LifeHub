@@ -1,4 +1,4 @@
-rootProject.name = "template"
+rootProject.name = "LifeHub"
 
 plugins {
     // See documentation on https://scaffoldit.dev
@@ -24,7 +24,7 @@ hytale {
 
     manifest {
         Group = "Saltt"
-        Name = "template"
-        Main = "gg.emberfall.template.Main"
+        Name = "LifeHub"
+        Main = "dev.saltt.lifehub.Main"
     }
 }
