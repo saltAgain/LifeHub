@@ -1,6 +1,7 @@
 package dev.saltt.hub.database.repos;
 
 
+import dev.saltt.common.api.types.common.PvPStats;
 import dev.saltt.hub.database.Repository;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;

@@ -1,8 +1,9 @@
 package dev.saltt.hub.database.repos;
 
+import dev.saltt.common.api.LifeGameType;
 import dev.saltt.common.api.types.SurvivalGamesMatch;
 
-import dev.saltt.common.api.types.base.PvPStats;
+import dev.saltt.common.api.types.common.PvPStats;
 import org.jdbi.v3.core.Jdbi;
 
 import java.time.LocalTime;
