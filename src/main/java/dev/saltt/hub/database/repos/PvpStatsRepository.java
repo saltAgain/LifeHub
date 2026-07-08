@@ -1,7 +1,6 @@
 package dev.saltt.hub.database.repos;
 
 
-import dev.saltt.common.api.types.base.PvPStats;
 import dev.saltt.hub.database.Repository;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.RowMapper;
@@ -25,6 +24,7 @@ public final class PvpStatsRepository extends Repository<PvPStats> {
                 List.of("match_id", "uuid"),
                 List.of("match_id", "uuid", "kills", "assists", "damage_dealt", "damage_taken"),
                 MAPPER);
+
     }
 
     @Override protected Map<String, Object> toRow(PvPStats s) {
