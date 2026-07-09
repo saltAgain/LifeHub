@@ -23,6 +23,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import javax.annotation.Nonnull;
+import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,8 @@ public class Main extends JavaPlugin {
     private FlushOrchestrator orchestrator;
     private Server grpcServer;
     private ExecutorService grpcExecutor;
+
+    private PlayerRepository playerRepo;
 
     public Main(@Nonnull JavaPluginInit init) {
         super(init);
@@ -67,7 +70,7 @@ public class Main extends JavaPlugin {
         var sgWriter     = new SurvivalGamesFlushWriter(statsRepo, sgRepo);
         this.orchestrator = new FlushOrchestrator(database.jdbi(), sgWriter);
 
-        PlayerRepository playerRepo = new PlayerRepository(database.jdbi());
+        playerRepo = new PlayerRepository(database.jdbi());
 
         getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onPlayerReady);
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, this::onPlayerDisconnect);
@@ -128,7 +131,14 @@ public class Main extends JavaPlugin {
         PlayerRef playerRef = store.getComponent(ref, PlayerRef.getComponentType());
         if (playerRef == null) return;
 
-        playerService.onJoin(playerRef.getUuid(), playerRef.getUsername(), null);   // ip: null-safe
+        var handler = playerRef.getPacketHandler();
+
+        InetSocketAddress address =
+                (InetSocketAddress) handler.getChannel().remoteAddress();
+
+        String ip = address.getAddress().getHostAddress();
+
+        playerService.onJoin(playerRef.getUuid(), playerRef.getUsername(), ip);
     }
 
     private void onPlayerDisconnect(PlayerDisconnectEvent event) {

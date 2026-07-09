@@ -1,7 +1,10 @@
 package dev.saltt.hub;
 
-import dev.saltt.common.api.types.LifePlayer;
 
+import dev.saltt.hub.database.domains.LifePlayer;
+import dev.saltt.hub.database.repos.PlayerRepository;
+
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,11 +19,11 @@ public final class PlayerService implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(PlayerService.class.getName());
 
-    private final LifePlayerRepository repo;
+    private final PlayerRepository repo;
     private final ExecutorService dbExecutor;
     private final Map<UUID, LifePlayer> online = new ConcurrentHashMap<>();
 
-    public PlayerService(LifePlayerRepository repo) {
+    public PlayerService(PlayerRepository repo) {
         this.repo = repo;
         this.dbExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "LifeHub-PlayerDB");
@@ -29,14 +32,10 @@ public final class PlayerService implements AutoCloseable {
         });
     }
 
-    /** Called from the event thread; DB work is offloaded. ip may be null. */
     public void onJoin(UUID uuid, String currentName, String ip) {
         dbExecutor.execute(() -> {
             try {
-                LifePlayer player = repo.findById(uuid).orElseGet(() -> LifePlayer.create(uuid));
-                player.recordLogin(currentName, ip);
-                repo.save(player);
-                online.put(uuid, player);
+                repo.observe(uuid, currentName, ip, Instant.now());
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "Failed to persist join for " + uuid, e);
             }
