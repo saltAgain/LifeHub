@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public abstract class Repository<T> {
+public abstract class GameFlushRepository<T> {
 
     protected final Jdbi jdbi;
     protected final String table;
@@ -19,8 +19,8 @@ public abstract class Repository<T> {
     protected final RowMapper<T> mapper;
     private final String upsertSql;
 
-    protected Repository(Jdbi jdbi, String table, List<String> keyColumns,
-                         List<String> columns, RowMapper<T> mapper) {
+    protected GameFlushRepository(Jdbi jdbi, String table, List<String> keyColumns,
+                                  List<String> columns, RowMapper<T> mapper) {
         this.jdbi = jdbi;
         this.table = table;
         this.keyColumns = List.copyOf(keyColumns);

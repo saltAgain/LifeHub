@@ -10,14 +10,22 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.Config;
-
 import dev.saltt.hub.database.Database;
-import dev.saltt.hub.database.repos.LifePlayerRepository;
-import dev.saltt.hub.database.repos.PvpStatsRepository;
-import dev.saltt.hub.database.repos.SurvivalGamesMatchRepository;
-import dev.saltt.hub.rest.HttpApi;
+import dev.saltt.hub.database.FlushOrchestrator;
+import dev.saltt.hub.database.repos.MatchPlayerStatsGameFlushRepository;
+import dev.saltt.hub.database.repos.PlayerRepository;
+import dev.saltt.hub.database.repos.SurvivalGamesFlushWriter;
+import dev.saltt.hub.database.repos.SurvivalGamesPlayerGameFlushRepository;
+
+import dev.saltt.hub.grpc.FlushServiceImpl;
+import dev.saltt.hub.grpc.LifePlayerServiceImpl;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
 
 import javax.annotation.Nonnull;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public class Main extends JavaPlugin {
@@ -25,13 +33,14 @@ public class Main extends JavaPlugin {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static Main instance;
 
-    // MUST be created in the constructor / field initializer — loading after setup() throws.
     private final Config<HubConfig> config = this.withConfig("LifeHub", HubConfig.CODEC);
 
     private Database database;
     private PlayerService playerService;
-    private SurvivalGamesMatchRepository matchRepo;
-    private HttpApi httpApi;
+
+    private FlushOrchestrator orchestrator;
+    private Server grpcServer;
+    private ExecutorService grpcExecutor;
 
     public Main(@Nonnull JavaPluginInit init) {
         super(init);
@@ -47,18 +56,19 @@ public class Main extends JavaPlugin {
     protected void setup() {
         LOGGER.at(Level.INFO).log("[LifeHub] Setting up...");
 
-        config.save();                        // create the config file on first run
-        HubConfig cfg = config.get();          // read once, on the setup (single) thread
+        config.save();
+        HubConfig cfg = config.get();
 
-        this.database = Database.connect(cfg);    // Hikari + Flyway migrations + JDBI
+        this.database = Database.connect(cfg);
 
-        PvpStatsRepository pvpRepo = new PvpStatsRepository(database.jdbi());
-        this.matchRepo = new SurvivalGamesMatchRepository(database.jdbi(), pvpRepo);
-        LifePlayerRepository playerRepo = new LifePlayerRepository(database.jdbi());
 
-        this.playerService = new PlayerService(playerRepo);
+        var statsRepo    = new MatchPlayerStatsGameFlushRepository(database.jdbi());
+        var sgRepo       = new SurvivalGamesPlayerGameFlushRepository(database.jdbi());
+        var sgWriter     = new SurvivalGamesFlushWriter(statsRepo, sgRepo);
+        this.orchestrator = new FlushOrchestrator(database.jdbi(), sgWriter);
 
-        // Player data on join / leave — DB work is offloaded inside PlayerService, never the main thread.
+        PlayerRepository playerRepo = new PlayerRepository(database.jdbi());
+
         getEventRegistry().registerGlobal(PlayerReadyEvent.class, this::onPlayerReady);
         getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, this::onPlayerDisconnect);
 
@@ -67,20 +77,47 @@ public class Main extends JavaPlugin {
 
     @Override
     protected void start() {
+        HubConfig cfg = config.get();
         try {
-            this.httpApi = HttpApi.start(config.get(), matchRepo);
-            LOGGER.at(Level.INFO).log("[LifeHub] Flush API started");
+            this.grpcExecutor = Executors.newFixedThreadPool(cfg.getApiThreads());
+
+            this.grpcServer = ServerBuilder.forPort(cfg.getApiPort())
+                    .executor(grpcExecutor)
+                    .addService(new FlushServiceImpl(orchestrator))
+                    .build()
+                    .start();
+
+            this.grpcServer = ServerBuilder.forPort(cfg.getApiPort())
+                    .executor(grpcExecutor)
+                    .addService(new FlushServiceImpl(orchestrator))
+                    .addService(new LifePlayerServiceImpl(playerRepo))
+                    .build()
+                    .start();
+
+            LOGGER.at(Level.INFO).log("[LifeHub] Flush gRPC server listening on port " + cfg.getApiPort());
         } catch (Exception e) {
-            LOGGER.at(Level.SEVERE).log("[LifeHub] Failed to start flush API: " + e.getMessage());
+            LOGGER.at(Level.SEVERE).log("[LifeHub] Failed to start flush gRPC server: " + e.getMessage());
         }
     }
+
 
     @Override
     protected void shutdown() {
         LOGGER.at(Level.INFO).log("[LifeHub] Shutting down...");
-        if (httpApi != null) httpApi.close();
+
+        // Reverse order: stop accepting flushes, drain, then close the pool.
+        if (grpcServer != null) {
+            try {
+                grpcServer.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                grpcServer.shutdownNow();
+            }
+        }
+        if (grpcExecutor != null) grpcExecutor.shutdown();
         if (playerService != null) playerService.close();
         if (database != null) database.close();
+
         instance = null;
     }
 

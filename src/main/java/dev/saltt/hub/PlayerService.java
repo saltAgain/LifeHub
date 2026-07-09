@@ -1,7 +1,6 @@
 package dev.saltt.hub;
 
 import dev.saltt.common.api.types.LifePlayer;
-import dev.saltt.hub.database.repos.LifePlayerRepository;
 
 import java.util.Map;
 import java.util.Optional;
