@@ -18,6 +18,7 @@ import dev.saltt.hub.database.repos.SurvivalGamesFlushWriter;
 import dev.saltt.hub.database.repos.SurvivalGamesPlayerGameFlushRepository;
 
 import dev.saltt.hub.grpc.FlushServiceImpl;
+import dev.saltt.hub.grpc.HeartbeatServiceImpl;
 import dev.saltt.hub.grpc.LifePlayerServiceImpl;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -94,6 +95,14 @@ public class Main extends JavaPlugin {
                     .executor(grpcExecutor)
                     .addService(new FlushServiceImpl(orchestrator))
                     .addService(new LifePlayerServiceImpl(playerRepo))
+                    .build()
+                    .start();
+
+            this.grpcServer = ServerBuilder.forPort(cfg.getApiPort())
+                    .executor(grpcExecutor)
+                    .addService(new FlushServiceImpl(orchestrator))
+                    .addService(new LifePlayerServiceImpl(playerRepo))
+                    .addService(new HeartbeatServiceImpl(/* matchmaker */))   // <- add once matchmaker exists
                     .build()
                     .start();
 
