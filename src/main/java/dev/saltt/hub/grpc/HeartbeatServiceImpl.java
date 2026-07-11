@@ -18,17 +18,6 @@ public final class HeartbeatServiceImpl extends HeartbeatServiceGrpc.HeartbeatSe
 
     private static final Logger LOG = Logger.getLogger(HeartbeatServiceImpl.class.getName());
 
-    // TODO: inject your matchmaker / server-registry component here.
-    //       Heartbeat state is in-memory (a ConcurrentHashMap keyed by match_id or server_id),
-    //       NOT a DB table — it's live status, not history. Wire it in via the constructor
-    //       the same way the other services take their repo/orchestrator.
-    //
-    // private final MatchmakerRegistry matchmaker;
-    //
-    // public HeartbeatServiceImpl(MatchmakerRegistry matchmaker) {
-    //     this.matchmaker = matchmaker;
-    // }
-
     @Override
     public void heartbeat(SubHeartbeatMessage req, StreamObserver<HeartbeatAck> obs) {
         try {
