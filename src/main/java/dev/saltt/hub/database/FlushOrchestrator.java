@@ -20,6 +20,7 @@ public final class FlushOrchestrator {
         this.sgWriter = sgWriter;
     }
 
+
     public void write(FlushEnvelope env) {
         jdbi.useTransaction(h -> {
             h.createUpdate("""
